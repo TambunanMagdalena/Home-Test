@@ -38,15 +38,12 @@ jobs:
 
       - name: Create .env for CI (tests & local run)
         run: |
-          # DB (service is the postgres service above)
           echo "DB_POSTGRES_HOST=localhost" > .env
           echo "DB_POSTGRES_PORT=5432" >> .env
           echo "DB_POSTGRES_NAME=test_db" >> .env
           echo "DB_POSTGRES_USER=test_user" >> .env
           echo "DB_POSTGRES_PASSWORD=test_password" >> .env
           echo "DB_POSTGRES_SCHEMA=public" >> .env
-
-          # App / config keys used by pkg/config (pastikan sesuai dengan viper keys di kode)
           echo "APP_ENVIRONMENT=test" >> .env
           echo "APP_PORT=3005" >> .env
           echo "APP_HOST=http://localhost:3005" >> .env
@@ -57,7 +54,6 @@ jobs:
 
       - name: Run tests (with exported .env)
         run: |
-          # export vars from .env so go test sees them
           set -a
           source .env
           set +a
@@ -84,10 +80,7 @@ jobs:
           set -a
           source .env
           set +a
-
-          # run app in background and capture logs
           ./main > app.log 2>&1 & APP_PID=$!
-
           echo "Waiting for health endpoint up to 60s..."
           for i in $(seq 1 12); do
             if curl -sSf http://localhost:3005/health >/dev/null 2>&1; then
@@ -97,20 +90,16 @@ jobs:
             echo "Waiting... ($i/12)"
             sleep 5
           done
-
-          # if health still not up, print logs and fail
           if ! curl -sSf http://localhost:3005/health >/dev/null 2>&1; then
             echo "=== app.log (full) ==="
             cat app.log || true
             kill $APP_PID || true
             exit 1
           fi
-
-          # stop the app after check
           kill $APP_PID || true
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: go-binary
           path: main

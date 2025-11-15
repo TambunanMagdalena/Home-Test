@@ -57,13 +57,12 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          # pastikan environment tersedia untuk go test
+          # export .env so tests read same env vars
           set -a
           source .env
           set +a
           go test -v ./...
         env:
-          # keep explicit DB_POSTGRES_* in case some tests rely on them in env mapping
           DB_POSTGRES_HOST: localhost
           DB_POSTGRES_PORT: 5432
           DB_POSTGRES_NAME: test_db
@@ -120,24 +119,39 @@ jobs:
           echo "MIDTRANS_CLIENT_KEY=test-client-key" >> .env
           echo "MIDTRANS_ENVIRONMENT=sandbox" >> .env
 
-      - name: Build application
+      - name: Run DB migrations
         run: |
-          cd cmd
-          CGO_ENABLED=0 GOOS=linux go build -o ../main .
+          # install psql client (runner default is Ubuntu)
+          sudo apt-get update -y
+          sudo apt-get install -y postgresql-client
 
-      - name: Start application
-        run: |
-          # eksport variable dari .env ke environment proses supaya ./main membaca DB_POSTGRES_* dan APP_*
+          # export env vars from .env
           set -a
           source .env
           set +a
 
-          # jalankan binary di background dan arahkan log ke file
-          ./main > app.log 2>&1 &
+          echo "Running SQL migrations on $DB_POSTGRES_HOST:$DB_POSTGRES_PORT/$DB_POSTGRES_NAME as $DB_POSTGRES_USER"
+
+          # fail fast on SQL error
+          PGPASSWORD="$DB_POSTGRES_PASSWORD" psql -h "$DB_POSTGRES_HOST" -p "$DB_POSTGRES_PORT" -U "$DB_POSTGRES_USER" -d "$DB_POSTGRES_NAME" -v ON_ERROR_STOP=1 -f .github/sql/init.sql
+
+      - name: Build application
+        run: |
+          cd cmd
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../main .
+
+      - name: Start application
+        run: |
+          # export env from .env so process has correct DB/APP vars
+          set -a
+          source .env
+          set +a
+
+          # start app in background, capture logs
+          ./main > app.log 2>&1 & APP_PID=$!
 
           echo "Application starting... waiting for health endpoint (max 60s)"
 
-          # tunggu health endpoint siap (retry)
           for i in $(seq 1 12); do
             if curl -sSf http://localhost:3005/health >/dev/null 2>&1; then
               echo "Health endpoint is up"
@@ -147,20 +161,17 @@ jobs:
             sleep 5
           done
 
-          # tampilkan sebagian log untuk debugging
           echo "=== app.log (last 200 lines) ==="
-          tail -n 200 app.log
+          tail -n 200 app.log || true
 
       - name: Run API Tests with curl
         run: |
-          # Test health endpoint
           echo "Testing health endpoint..."
           curl -f http://localhost:3005/health || (echo "❌ Health check failed"; exit 1)
 
-          # Test fields endpoint
           echo "Testing fields endpoint..."
-          curl -f http://localhost:3005/api/fields || (echo "❌ Fields endpoint failed"; exit 1)
-
+          # fail if 5xx or non-200
+          curl -sSf http://localhost:3005/api/fields -o /tmp/fields.json || (echo "❌ Fields endpoint failed"; cat /tmp/fields.json || true; exit 1)
           echo "All API endpoints are responsive"
 
   build:
@@ -196,7 +207,6 @@ jobs:
 
       - name: Test Docker image
         run: |
-          # Test that Docker image can start
           docker run --rm -d --name test-container -p 3005:3005 \
             -e DB_POSTGRES_HOST=localhost \
             -e DB_POSTGRES_PORT=5432 \
@@ -216,7 +226,7 @@ jobs:
           docker ps | grep test-container || (echo "❌ Container not running"; exit 1)
           echo " Docker container running successfully"
 
-          # Test health endpoint
+          # Test health endpoint in container
           curl -f http://localhost:3005/health || (echo "❌ Health check failed in container"; exit 1)
           echo " Health endpoint working in container"
 
