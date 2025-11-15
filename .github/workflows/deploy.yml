@@ -48,16 +48,22 @@ jobs:
           echo "DB_POSTGRES_PASSWORD=test_password" >> .env
           echo "DB_POSTGRES_SCHEMA=public" >> .env
           echo "JWT_SECRET=test-jwt-secret-2025" >> .env
-          echo "SERVICE_ENVIRONMENT=test" >> .env
-          echo "SERVICE_PORT=3005" >> .env
-          echo "HTTP_HOST=http://localhost:3005" >> .env
+          echo "APP_ENVIRONMENT=test" >> .env
+          echo "APP_PORT=3005" >> .env
+          echo "APP_HOST=http://localhost:3005" >> .env
           echo "MIDTRANS_SERVER_KEY=test-server-key" >> .env
           echo "MIDTRANS_CLIENT_KEY=test-client-key" >> .env
           echo "MIDTRANS_ENVIRONMENT=sandbox" >> .env
 
       - name: Run Unit Tests
-        run: go test -v ./...
+        run: |
+          # pastikan environment tersedia untuk go test
+          set -a
+          source .env
+          set +a
+          go test -v ./...
         env:
+          # keep explicit DB_POSTGRES_* in case some tests rely on them in env mapping
           DB_POSTGRES_HOST: localhost
           DB_POSTGRES_PORT: 5432
           DB_POSTGRES_NAME: test_db
@@ -65,8 +71,9 @@ jobs:
           DB_POSTGRES_PASSWORD: test_password
           DB_POSTGRES_SCHEMA: public
           JWT_SECRET: test-jwt-secret-2025
-          SERVICE_ENVIRONMENT: test
-          SERVICE_PORT: 3005
+          APP_ENVIRONMENT: test
+          APP_PORT: 3005
+          APP_HOST: http://localhost:3005
 
   api-test:
     name: Run API Tests
@@ -106,9 +113,9 @@ jobs:
           echo "DB_POSTGRES_PASSWORD=test_password" >> .env
           echo "DB_POSTGRES_SCHEMA=public" >> .env
           echo "JWT_SECRET=test-jwt-secret-2025" >> .env
-          echo "SERVICE_ENVIRONMENT=test" >> .env
-          echo "SERVICE_PORT=3005" >> .env
-          echo "HTTP_HOST=http://localhost:3005" >> .env
+          echo "APP_ENVIRONMENT=test" >> .env
+          echo "APP_PORT=3005" >> .env
+          echo "APP_HOST=http://localhost:3005" >> .env
           echo "MIDTRANS_SERVER_KEY=test-server-key" >> .env
           echo "MIDTRANS_CLIENT_KEY=test-client-key" >> .env
           echo "MIDTRANS_ENVIRONMENT=sandbox" >> .env
@@ -120,9 +127,29 @@ jobs:
 
       - name: Start application
         run: |
-          ./main &
-          echo " Application starting..."
-          sleep 15  #  Tunggu lebih lama untuk app start
+          # eksport variable dari .env ke environment proses supaya ./main membaca DB_POSTGRES_* dan APP_*
+          set -a
+          source .env
+          set +a
+
+          # jalankan binary di background dan arahkan log ke file
+          ./main > app.log 2>&1 &
+
+          echo "Application starting... waiting for health endpoint (max 60s)"
+
+          # tunggu health endpoint siap (retry)
+          for i in $(seq 1 12); do
+            if curl -sSf http://localhost:3005/health >/dev/null 2>&1; then
+              echo "Health endpoint is up"
+              break
+            fi
+            echo "Waiting for health endpoint... ($i/12)"
+            sleep 5
+          done
+
+          # tampilkan sebagian log untuk debugging
+          echo "=== app.log (last 200 lines) ==="
+          tail -n 200 app.log
 
       - name: Run API Tests with curl
         run: |
@@ -134,7 +161,7 @@ jobs:
           echo "Testing fields endpoint..."
           curl -f http://localhost:3005/api/fields || (echo "❌ Fields endpoint failed"; exit 1)
 
-          echo " All API endpoints are responsive"
+          echo "All API endpoints are responsive"
 
   build:
     name: Build Docker Image
@@ -157,8 +184,9 @@ jobs:
           echo "DB_POSTGRES_PASSWORD=test_password" >> .env
           echo "DB_POSTGRES_SCHEMA=public" >> .env
           echo "JWT_SECRET=test-jwt-secret-2025" >> .env
-          echo "SERVICE_ENVIRONMENT=test" >> .env
-          echo "SERVICE_PORT=3005" >> .env
+          echo "APP_ENVIRONMENT=test" >> .env
+          echo "APP_PORT=3005" >> .env
+          echo "APP_HOST=http://localhost:3005" >> .env
 
       - name: Build Docker image
         run: |
@@ -177,8 +205,8 @@ jobs:
             -e DB_POSTGRES_PASSWORD=test_password \
             -e DB_POSTGRES_SCHEMA=public \
             -e JWT_SECRET=test-secret \
-            -e SERVICE_ENVIRONMENT=test \
-            -e SERVICE_PORT=3005 \
+            -e APP_ENVIRONMENT=test \
+            -e APP_PORT=3005 \
             ${{ env.IMAGE_NAME }}:latest
 
           echo " Waiting for container to start..."
