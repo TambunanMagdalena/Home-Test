@@ -1,0 +1,191 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: ["main"]
+
+env:
+  IMAGE_NAME: sagara-booking-api
+  CONTAINER_NAME: sagara-booking-api
+
+jobs:
+  unit-test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.24.2"
+          cache: true
+
+      - name: Run Unit Tests
+        run: go test -v ./...
+        env:
+          DB_POSTGRES_HOST: localhost
+          DB_POSTGRES_PORT: 5432
+          DB_POSTGRES_NAME: test_db
+          DB_POSTGRES_USER: test_user
+          DB_POSTGRES_PASSWORD: test_password
+          DB_POSTGRES_SCHEMA: test_schema
+          JWT_SECRET: test-jwt-secret-2025
+          SERVICE_ENVIRONMENT: test
+          SERVICE_PORT: 3005
+
+  api-test:
+    name: Run API Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.24.2"
+
+      - name: Build application
+        run: |
+          cd cmd
+          CGO_ENABLED=0 GOOS=linux go build -o ../main .
+
+      - name: Start application
+        run: |
+          ./main &
+          sleep 10
+        env:
+          DB_POSTGRES_HOST: localhost
+          DB_POSTGRES_PORT: 5432
+          DB_POSTGRES_NAME: test_db
+          DB_POSTGRES_USER: test_user
+          DB_POSTGRES_PASSWORD: test_password
+          DB_POSTGRES_SCHEMA: test_schema
+          JWT_SECRET: test-jwt-secret-2025
+          SERVICE_ENVIRONMENT: test
+          SERVICE_PORT: 3005
+
+      - name: Run API Tests with curl
+        run: |
+          # Test health endpoint
+          curl -f http://localhost:3005/health || exit 1
+
+          # Test fields endpoint
+          curl -f http://localhost:3005/api/fields || exit 1
+
+          echo " All API endpoints are responsive"
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [unit-test, api-test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        run: |
+          docker build . \
+            --file Dockerfile \
+            --tag ${{ env.IMAGE_NAME }}:latest
+
+      - name: Test Docker image
+        run: |
+          # Test that Docker image can start
+          docker run --rm -d --name test-container -p 3005:3005 \
+            -e DB_POSTGRES_HOST=localhost \
+            -e DB_POSTGRES_PORT=5432 \
+            -e DB_POSTGRES_NAME=test_db \
+            -e DB_POSTGRES_USER=test_user \
+            -e DB_POSTGRES_PASSWORD=test_password \
+            -e JWT_SECRET=test-secret \
+            -e SERVICE_ENVIRONMENT=test \
+            ${{ env.IMAGE_NAME }}:latest
+
+          sleep 10
+
+          # Check if container is running
+          docker ps | grep test-container || exit 1
+          echo " Docker container running successfully"
+
+          # Cleanup
+          docker stop test-container
+
+      - name: Save Docker image
+        run: |
+          docker save ${{ env.IMAGE_NAME }}:latest -o ${{ env.IMAGE_NAME }}.tar
+
+      - name: Upload Docker artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: ${{ env.IMAGE_NAME }}.tar
+          retention-days: 7
+
+  deploy-report:
+    name: Generate Deployment Report
+    runs-on: ubuntu-latest
+    needs: [unit-test, api-test, build]
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate deployment summary
+        run: |
+          echo "##  Sagara Booking API - Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application:** Sports Field Booking System" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Status:**  SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "###  Quality Gates" >> $GITHUB_STEP_SUMMARY
+          echo "-  Unit Tests: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "-  API Tests: PASSED" >> $GITHUB_STEP_SUMMARY
+          echo "-  Docker Build: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "###  Run Locally" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "git clone ${{ github.server_url }}/${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+          echo "cd ${{ github.event.repository.name }}" >> $GITHUB_STEP_SUMMARY
+          echo "cp cmd/.env.example cmd/.env" >> $GITHUB_STEP_SUMMARY
+          echo "docker-compose up --build" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
