@@ -1,5 +1,7 @@
-FROM golang:1.21.6-alpine AS build-stage
+# Build stage - UPDATE KE 1.24.2
+FROM golang:1.24.2-alpine AS build-stage
 
+# Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app
@@ -13,23 +15,20 @@ WORKDIR /app/cmd
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /go-binary
 
+# Production stage
 FROM alpine:latest
 
+# Install runtime dependencies
 RUN apk --no-cache add ca-certificates tzdata bash postgresql-client
-
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /
 
+# Copy binary
 COPY --from=build-stage /go-binary /go-binary
-COPY --from=build-stage /app/.env /.env
 
-COPY --from=build-stage /app/wait-for-it.sh /wait-for-it.sh
+# Copy wait-for-it script
+COPY wait-for-it.sh /wait-for-it.sh
 RUN chmod +x /wait-for-it.sh
-
-RUN chown -R appuser:appgroup /go-binary /wait-for-it.sh
-
-USER appuser
 
 EXPOSE 3005
 
