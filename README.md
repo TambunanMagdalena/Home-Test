@@ -81,6 +81,9 @@ MIDTRANS_SERVER_KEY=SB-Mid-server-key-anda
 MIDTRANS_CLIENT_KEY=SB-Mid-client-key-anda
 MIDTRANS_ENVIRONMENT=sandbox
 
+# Swagger UI
+http://localhost:3005/swagger/
+
 📚 Dokumentasi API
 Endpoint Autentikasi
 ![alt text](image.png)
