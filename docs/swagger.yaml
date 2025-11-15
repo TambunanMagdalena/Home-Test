@@ -1,0 +1,749 @@
+basePath: /api
+definitions:
+  take-home-test_app_models.BasicResponse:
+    properties:
+      data: {}
+      message: {}
+      pagination:
+        $ref: '#/definitions/take-home-test_app_models.Pagination'
+      status_code:
+        type: integer
+    type: object
+  take-home-test_app_models.BookingResponse:
+    properties:
+      created_at:
+        type: string
+      end_time:
+        type: string
+      field_id:
+        type: string
+      id:
+        type: string
+      start_time:
+        type: string
+      status:
+        type: string
+      user_id:
+        type: string
+    type: object
+  take-home-test_app_models.CreateBookingRequest:
+    properties:
+      end_time:
+        type: string
+      field_id:
+        type: string
+      start_time:
+        type: string
+    required:
+    - end_time
+    - field_id
+    - start_time
+    type: object
+  take-home-test_app_models.CreateFieldRequest:
+    properties:
+      location:
+        type: string
+      name:
+        type: string
+      price_per_hour:
+        minimum: 0
+        type: integer
+    required:
+    - location
+    - name
+    - price_per_hour
+    type: object
+  take-home-test_app_models.CreatePaymentRequest:
+    properties:
+      booking_id:
+        type: string
+      payment_method:
+        type: string
+    required:
+    - booking_id
+    - payment_method
+    type: object
+  take-home-test_app_models.FieldResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      location:
+        type: string
+      name:
+        type: string
+      price_per_hour:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  take-home-test_app_models.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  take-home-test_app_models.LoginResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/take-home-test_app_models.UserResponse'
+    type: object
+  take-home-test_app_models.Pagination:
+    properties:
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_page:
+        type: integer
+    type: object
+  take-home-test_app_models.PaymentResponse:
+    properties:
+      amount:
+        type: integer
+      booking_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      paid_at:
+        type: string
+      payment_method:
+        type: string
+      status:
+        type: string
+    type: object
+  take-home-test_app_models.PaymentTransactionResponse:
+    properties:
+      amount:
+        type: integer
+      payment_id:
+        type: string
+      redirect_url:
+        type: string
+      token:
+        type: string
+      transaction_id:
+        type: string
+    type: object
+  take-home-test_app_models.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      role:
+        enum:
+        - user
+        - admin
+        type: string
+    required:
+    - email
+    - name
+    - password
+    - role
+    type: object
+  take-home-test_app_models.UpdateFieldRequest:
+    properties:
+      location:
+        type: string
+      name:
+        type: string
+      price_per_hour:
+        minimum: 0
+        type: integer
+    required:
+    - location
+    - name
+    - price_per_hour
+    type: object
+  take-home-test_app_models.UserResponse:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+    type: object
+host: localhost:3005
+info:
+  contact:
+    email: support@sagaratech.com
+    name: API Support
+  description: RESTful API for sports field booking system - Take Home Test
+  title: Sports Field Booking API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Login request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/take-home-test_app_models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      summary: Login user
+      tags:
+      - Authentication
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account
+      parameters:
+      - description: Register request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/take-home-test_app_models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      summary: Register new user
+      tags:
+      - Authentication
+  /bookings:
+    post:
+      consumes:
+      - application/json
+      description: Create a new field booking. **AUTHENTICATED USERS ONLY** - Users
+        can only book for themselves. System checks for time slot availability and
+        prevents overlapping bookings.
+      parameters:
+      - description: Booking data including field_id, start_time, and end_time
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/take-home-test_app_models.CreateBookingRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.BookingResponse'
+              type: object
+        "400":
+          description: Bad Request - Invalid input, field not available, or time conflict
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "401":
+          description: Unauthorized - JWT token missing or invalid
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "409":
+          description: Conflict - Time slot already booked
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      security:
+      - BearerAuth: []
+      summary: Create new booking
+      tags:
+      - Bookings
+  /bookings/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get booking details by ID. **AUTHENTICATED USERS** can access their
+        own bookings. **ADMINS** can access all bookings.
+      parameters:
+      - description: Booking ID (UUID format)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.BookingResponse'
+              type: object
+        "403":
+          description: Forbidden - User cannot access this booking
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "404":
+          description: Not Found - Booking with specified ID does not exist
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      security:
+      - BearerAuth: []
+      summary: Get booking by ID
+      tags:
+      - Bookings
+  /bookings/user:
+    get:
+      consumes:
+      - application/json
+      description: Get all bookings for the authenticated user. **USERS CAN ONLY SEE
+        THEIR OWN BOOKINGS**.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/take-home-test_app_models.BookingResponse'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Get user bookings
+      tags:
+      - Bookings
+  /fields:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all available sports fields. PUBLIC ACCESS - No authentication
+        required.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/take-home-test_app_models.FieldResponse'
+                  type: array
+              type: object
+      summary: Get all fields
+      tags:
+      - Fields
+    post:
+      consumes:
+      - application/json
+      description: Create a new sports field. ADMIN ACCESS ONLY - Regular users cannot
+        create fields.
+      parameters:
+      - description: Field data including name, price_per_hour, and location
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/take-home-test_app_models.CreateFieldRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.FieldResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      security:
+      - BearerAuth: []
+      summary: Create new field
+      tags:
+      - Fields
+  /fields/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a sports field. ADMIN ACCESS ONLY - Regular users cannot
+        delete fields.
+      parameters:
+      - description: Field ID (UUID format)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete field
+      tags:
+      - Fields
+    get:
+      consumes:
+      - application/json
+      description: Get details of a specific sports field. PUBLIC ACCESS - No authentication
+        required.
+      parameters:
+      - description: Field ID (UUID format)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.FieldResponse'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      summary: Get field by ID
+      tags:
+      - Fields
+    put:
+      consumes:
+      - application/json
+      description: Update sports field information. ADMIN ACCESS ONLY - Regular users
+        cannot update fields.
+      parameters:
+      - description: Field ID (UUID format)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Field update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/take-home-test_app_models.UpdateFieldRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.FieldResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      security:
+      - BearerAuth: []
+      summary: Update field
+      tags:
+      - Fields
+  /payments:
+    post:
+      consumes:
+      - application/json
+      description: Process mock payment for a booking. **AUTHENTICATED USERS** can
+        pay for their own bookings. This is a mock implementation for testing.
+      parameters:
+      - description: Payment data including booking_id and payment_method
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/take-home-test_app_models.CreatePaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.PaymentResponse'
+              type: object
+        "400":
+          description: Bad Request - Invalid input or booking not found
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "403":
+          description: Forbidden - User cannot pay for this booking
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      security:
+      - BearerAuth: []
+      summary: Process payment (Mock)
+      tags:
+      - Payments
+  /payments/{booking_id}:
+    get:
+      consumes:
+      - application/json
+      description: Get payment details for a specific booking. **USERS** can access
+        payments for their own bookings. **ADMINS** can access all payments.
+      parameters:
+      - description: Booking ID (UUID format)
+        in: path
+        name: booking_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.PaymentResponse'
+              type: object
+        "403":
+          description: Forbidden - User cannot access this payment
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "404":
+          description: Not Found - Payment for specified booking does not exist
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      security:
+      - BearerAuth: []
+      summary: Get payment by booking ID
+      tags:
+      - Payments
+  /payments/{booking_id}/transaction:
+    post:
+      consumes:
+      - application/json
+      description: Create Midtrans payment transaction for a booking. Returns payment
+        URL for redirection to Midtrans payment page. **AUTHENTICATED USERS** can
+        create transactions for their own bookings.
+      parameters:
+      - description: Booking ID (UUID format)
+        in: path
+        name: booking_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/take-home-test_app_models.PaymentTransactionResponse'
+              type: object
+        "400":
+          description: Bad Request - Invalid booking or payment error
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+        "403":
+          description: Forbidden - User cannot create payment for this booking
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      security:
+      - BearerAuth: []
+      summary: Create real payment transaction (Midtrans)
+      tags:
+      - Payments
+  /payments/notification:
+    post:
+      consumes:
+      - application/json
+      description: Webhook endpoint for Midtrans payment notifications. **NO AUTHENTICATION
+        REQUIRED** - This endpoint is called by Midtrans server to update payment
+        status. Do not call this endpoint directly.
+      parameters:
+      - description: Midtrans notification payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/take-home-test_app_models.BasicResponse'
+      summary: Handle payment notification webhook
+      tags:
+      - Payments
+  /users/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get user details by ID (Admin only)
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user by ID
+      tags:
+      - Users
+  /users/profile:
+    get:
+      consumes:
+      - application/json
+      description: Get authenticated user's profile information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user profile
+      tags:
+      - Users
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT Authorization header using the Bearer scheme. Example: "Bearer
+      {token}"'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

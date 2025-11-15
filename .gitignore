@@ -1,0 +1,78 @@
+# Object file
+*.o
+
+# Ada Library Information  
+*.ali
+
+# ================================
+# GO SPECIFIC
+# ================================
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/tmp/
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+
+# Go workspace file
+go.work
+
+# ENVIRONMENT FILES
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+
+# IDE & EDITOR FILES
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# IntelliJ
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# GoLand
+*.idea/
+
+# OS GENERATED FILES
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# LOG FILES
+*.log
+logs/
+
+# DOCKER
+.docker/
+
+# TEMPORARY FILES
+/tmp/
+*.tmp
+*.temp
+
+# BUILD ARTIFACTS
+
+/dist/
+/build/
+/coverage/
