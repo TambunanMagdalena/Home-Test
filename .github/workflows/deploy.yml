@@ -57,13 +57,11 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          # pastikan environment tersedia untuk go test
           set -a
           source .env
           set +a
           go test -v ./...
         env:
-          # keep explicit DB_POSTGRES_* in case some tests rely on them in env mapping
           DB_POSTGRES_HOST: localhost
           DB_POSTGRES_PORT: 5432
           DB_POSTGRES_NAME: test_db
@@ -127,17 +125,11 @@ jobs:
 
       - name: Start application
         run: |
-          # eksport variable dari .env ke environment proses supaya ./main membaca DB_POSTGRES_* dan APP_*
           set -a
           source .env
           set +a
-
-          # jalankan binary di background dan arahkan log ke file
           ./main > app.log 2>&1 &
-
           echo "Application starting... waiting for health endpoint (max 60s)"
-
-          # tunggu health endpoint siap (retry)
           for i in $(seq 1 12); do
             if curl -sSf http://localhost:3005/health >/dev/null 2>&1; then
               echo "Health endpoint is up"
@@ -146,21 +138,15 @@ jobs:
             echo "Waiting for health endpoint... ($i/12)"
             sleep 5
           done
-
-          # tampilkan sebagian log untuk debugging
           echo "=== app.log (last 200 lines) ==="
           tail -n 200 app.log
 
       - name: Run API Tests with curl
         run: |
-          # Test health endpoint
           echo "Testing health endpoint..."
           curl -f http://localhost:3005/health || (echo "❌ Health check failed"; exit 1)
-
-          # Test fields endpoint
           echo "Testing fields endpoint..."
           curl -f http://localhost:3005/api/fields || (echo "❌ Fields endpoint failed"; exit 1)
-
           echo "All API endpoints are responsive"
 
   build:
@@ -196,7 +182,6 @@ jobs:
 
       - name: Test Docker image
         run: |
-          # Test that Docker image can start
           docker run --rm -d --name test-container -p 3005:3005 \
             -e DB_POSTGRES_HOST=localhost \
             -e DB_POSTGRES_PORT=5432 \
@@ -212,15 +197,12 @@ jobs:
           echo " Waiting for container to start..."
           sleep 20
 
-          # Check if container is running
           docker ps | grep test-container || (echo "❌ Container not running"; exit 1)
           echo " Docker container running successfully"
 
-          # Test health endpoint
           curl -f http://localhost:3005/health || (echo "❌ Health check failed in container"; exit 1)
           echo " Health endpoint working in container"
 
-          # Cleanup
           docker stop test-container
 
   deploy-report:
